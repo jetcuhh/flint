@@ -253,7 +253,7 @@ static int on_key(const struct tb_event *ev) {
         return 0;
     }
     if (confirm_sig) {
-        if (ev->ch == 'y' || ev->ch == 'Y') proc_signal(confirm_pid, confirm_sig);
+        if (ev->ch == 'y' || ev->ch == 'Y' || ev->key == TB_KEY_ENTER) proc_signal(confirm_pid, confirm_sig);
         confirm_sig = 0;
         return 0;
     }
@@ -274,8 +274,12 @@ static int on_key(const struct tb_event *ev) {
     }
     if (filter_edit) {
         size_t n = strlen(filter);
-        if (ev->key == TB_KEY_ENTER) filter_edit = 0;
-        else if (ev->key == TB_KEY_ESC) filter_edit = 0, filter[0] = 0;
+        if (ev->key == TB_KEY_ENTER) {
+            filter_edit = 0;
+            proc_rebuild();
+            if (filter[0]) proc_select_first();
+            return 0;
+        } else if (ev->key == TB_KEY_ESC) filter_edit = 0, filter[0] = 0;
         else if (ev->key == TB_KEY_BACKSPACE || ev->key == TB_KEY_BACKSPACE2) {
             while (n && ((unsigned char)filter[n - 1] & 0xc0) == 0x80) n--;
             if (n) n--;

@@ -155,6 +155,11 @@ void proc_rebuild(void) {
     sel_pid = nview ? pr[view[sel_idx]].pid : -1;
 }
 void proc_deselect(void) { sel_pid = -1; }
+void proc_select_first(void) {
+    if (!nview) return;
+    sel_idx = scroll_off = 0;
+    sel_pid = pr[view[0]].pid;
+}
 void proc_move(int d) {
     if (!nview) return;
     if (sel_pid < 0) { /* first move selects the top visible row */
@@ -328,12 +333,49 @@ void proc_draw(int x, int y, int w, int h) {
 }
 
 
+static int pend_pid, pend_sig;
+static long pend_at;
+static char pend_name[24];
+
 void proc_signal(int pid, int sig) {
     status_msg[0] = 0;
-    if (pid > 1 && kill(pid, sig) != 0) {
-        snprintf(status_msg, sizeof status_msg, "pid %d: %s", pid, strerror(errno));
+    pend_pid = 0;
+    if (pid <= 1) return;
+    if (kill(pid, sig) != 0) {
+        if (errno == EPERM) snprintf(status_msg, sizeof status_msg, "pid %d: permission denied, run flint with sudo", pid);
+        else if (errno == ESRCH) snprintf(status_msg, sizeof status_msg, "pid %d: already exited", pid);
+        else snprintf(status_msg, sizeof status_msg, "pid %d: %s", pid, strerror(errno));
+        status_at = now_ms();
+        return;
+    }
+    pend_pid = pid, pend_sig = sig, pend_at = now_ms();
+    snprintf(pend_name, sizeof pend_name, "%s", confirm_name);
+}
+
+static void pend_check(void) {
+    if (!pend_pid || now_ms() - pend_at < 2000) return;
+    char path[64], buf[512], st = 0;
+    int alive = 0;
+    snprintf(path, sizeof path, "/proc/%d/stat", pend_pid);
+    if (slurp(path, buf, sizeof buf) > 0) {
+        char *lp = strchr(buf, '('), *rp = strrchr(buf, ')');
+        if (lp && rp && rp > lp && rp[1] == ' ') {
+            size_t cl = (size_t)(rp - lp - 1);
+            if (cl > sizeof pend_name - 1) cl = sizeof pend_name - 1;
+            st = rp[2];
+            alive = strlen(pend_name) == cl && !memcmp(pend_name, lp + 1, cl) && st != 'Z' && st != 'X';
+        }
+    }
+    if (alive) {
+        if (pend_sig == SIGKILL && st == 'D')
+            snprintf(status_msg, sizeof status_msg, "pid %d (%s): stuck in uninterruptible wait, cannot be killed", pend_pid, pend_name);
+        else if (pend_sig == SIGKILL)
+            snprintf(status_msg, sizeof status_msg, "pid %d (%s): still running after kill", pend_pid, pend_name);
+        else
+            snprintf(status_msg, sizeof status_msg, "pid %d (%s): refused to terminate, try kill (k)", pend_pid, pend_name);
         status_at = now_ms();
     }
+    pend_pid = 0;
 }
 
 static void sb_set(int my) {
@@ -662,5 +704,6 @@ void proc_confirm_click(int mx, int my) {
 
 void proc_update(void) {
     read_procs();
+    pend_check();
     proc_rebuild();
 }

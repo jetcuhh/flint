@@ -138,6 +138,7 @@ void proc_update(void);
 void proc_draw(int x, int y, int w, int h);
 void proc_move(int d);
 void proc_deselect(void);
+void proc_select_first(void);
 void proc_scroll(int d);
 void proc_rebuild(void);
 void proc_signal(int pid, int sig);
