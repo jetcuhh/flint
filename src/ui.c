@@ -175,12 +175,12 @@ int tile(int x, int y, int w, int h, u32 bg) {
     return 1;
 }
 
-/* "■ name ───── info": first info that fits; returns its x or -1 */
+/* "name ───── info": first info that fits; returns its x or -1 */
 int label(int x, int y, int w, u32 mark, const char *name, const char *const *info, int n, u32 ifg, int *iw_out) {
-    int right = x + w - 2, cx = x + 3;
+    int right = x + w - 2, cx = x + 1;
     if (iw_out) *iw_out = 0;
     if (right < cx + 1) return -1;
-    cell(x + 1, y, 0x25a0, mark, 0);
+    (void)mark;
     cx += txt(cx, y, right - cx + 1, BOLD(theme.bright), 0, name);
     int rs = cx + 1, ix = -1, ic = 0;
     for (int i = 0; i < n && ix < 0; i++) {
